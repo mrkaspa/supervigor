@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// A Supervigor starts and supervises goroutines
 type Supervigor struct {
 	SuperviseChan chan RunnableWithName
 	runnables     map[string]*runnableWithChan
@@ -17,27 +18,34 @@ type runnableWithChan struct {
 	runnable Runnable
 }
 
+// A RunnableWithName packs the name of the goroutine,
+// the max amount of restarts and the Runnble object to run
 type RunnableWithName struct {
 	Name        string
 	MaxRestarts int
 	Runnable    Runnable
 }
 
+// Read is the basic interface that wraps the Run method.
+// Run() is the main thread for the goroutine that will be
+// started and restarted
 type Runnable interface {
 	Run()
 }
 
+
+// NewSupervigor returns and runs in a goroutine the Supervigor
 func NewSupervigor() Supervigor {
 	s := Supervigor{
 		SuperviseChan: make(chan RunnableWithName),
 		runnables: map[string]*runnableWithChan{},
 		mapMutex: &sync.Mutex{},
 	}
-	go s.Run()
+	go s.run()
 	return s
 }
 
-func (s *Supervigor) Run() {
+func (s *Supervigor) run() {
 	for {
 		select {
 		case rwn := <-s.SuperviseChan:
@@ -74,6 +82,7 @@ func (s *Supervigor) supervise(name string, maxRestarts int, r Runnable) {
 	go run(rwc)
 }
 
+// run the go routine if it panics notify to the supervigor
 func run(rwc *runnableWithChan) {
 	defer func() {
 		if r := recover(); r != nil {
