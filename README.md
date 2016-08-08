@@ -2,6 +2,10 @@
 
 Supervisor for gouroutines.
 
+## Check the doc
+
+[link](https://godoc.org/github.com/mrkaspa/supervigor)
+
 ## How to use
 
 The routine to supervise must implement the Runnable interface:
