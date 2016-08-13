@@ -1,15 +1,16 @@
-package supervigor
+package supervigor_test
 
 import (
 	"fmt"
 	"testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/mrkaspa/supervigor"
 )
 
-type Runner struct{
-	name string
+type Runner struct {
+	name      string
 	mustPanic bool
-	doneChan chan bool
+	doneChan  chan bool
 }
 
 func (r *Runner) Run() {
@@ -23,24 +24,24 @@ func (r *Runner) Run() {
 }
 
 func TestNewSupervigor(t *testing.T) {
-	sup := NewSupervigor()
+	sup := supervigor.NewSupervigor()
 	run := &Runner{"Michel", true, make(chan bool)}
-	sup.SuperviseChan <- RunnableWithName{
+	sup.Supervise(supervigor.RunnableWithName{
 		Name: "demo",
 		MaxRestarts: 1,
 		Runnable: run,
-	}
-	assert.False(t, <- run.doneChan)
-	assert.True(t, <- run.doneChan)
+	})
+	assert.False(t, <-run.doneChan)
+	assert.True(t, <-run.doneChan)
 }
 
 func TestNewSupervigorMustFail(t *testing.T) {
-	sup := NewSupervigor()
+	sup := supervigor.NewSupervigor()
 	run := &Runner{"Michel", true, make(chan bool)}
-	sup.SuperviseChan <- RunnableWithName{
+	sup.Supervise(supervigor.RunnableWithName{
 		Name: "demo",
 		MaxRestarts: 0,
 		Runnable: run,
-	}
-	assert.False(t, <- run.doneChan)
+	})
+	assert.False(t, <-run.doneChan)
 }

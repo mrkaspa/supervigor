@@ -3,13 +3,14 @@ package supervigor
 import (
 	"fmt"
 	"sync"
+	"bytes"
 )
 
 // A Supervigor starts and supervises goroutines
 type Supervigor struct {
-	SuperviseChan chan RunnableWithName
+	superviseChan chan RunnableWithName
 	runnables     map[string]*runnableWithChan
-	mapMutex *sync.Mutex
+	mapMutex      *sync.Mutex
 }
 
 type runnableWithChan struct {
@@ -37,7 +38,7 @@ type Runnable interface {
 // NewSupervigor returns and runs in a goroutine the Supervigor
 func NewSupervigor() Supervigor {
 	s := Supervigor{
-		SuperviseChan: make(chan RunnableWithName),
+		superviseChan: make(chan RunnableWithName),
 		runnables: map[string]*runnableWithChan{},
 		mapMutex: &sync.Mutex{},
 	}
@@ -45,20 +46,25 @@ func NewSupervigor() Supervigor {
 	return s
 }
 
+// Supervise a runnable
+func (s *Supervigor) Supervise(rwn RunnableWithName) {
+	s.superviseChan <- rwn
+}
+
 func (s *Supervigor) run() {
 	for {
 		select {
-		case rwn := <-s.SuperviseChan:
+		case rwn := <-s.superviseChan:
 			fmt.Printf("supervising %s \n", rwn.Name)
-			s.supervise(rwn.Name, rwn.MaxRestarts, rwn.Runnable)
+			s.runAndSupervise(rwn.Name, rwn.MaxRestarts, rwn.Runnable)
 		}
 	}
 }
 
-func (s *Supervigor) supervise(name string, maxRestarts int, r Runnable) {
+func (s *Supervigor) runAndSupervise(name string, maxRestarts int, r Runnable) {
 	s.mapMutex.Lock()
 	rwc, ok := s.runnables[name]
-	if !ok{
+	if !ok {
 		rwc = &runnableWithChan{
 			rchan: make(chan bool),
 			runnable: r,
@@ -74,7 +80,7 @@ func (s *Supervigor) supervise(name string, maxRestarts int, r Runnable) {
 		s.runnables[name].restarts++
 		if s.runnables[name].restarts <= maxRestarts {
 			fmt.Printf("restarting #%d %s \n", s.runnables[name].restarts, name)
-			s.SuperviseChan <- RunnableWithName{name, maxRestarts, r}
+			s.superviseChan <- RunnableWithName{name, maxRestarts, r}
 		}
 		s.mapMutex.Unlock()
 	}()
@@ -91,4 +97,3 @@ func run(rwc *runnableWithChan) {
 	}()
 	rwc.runnable.Run()
 }
-
