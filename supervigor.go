@@ -3,7 +3,6 @@ package supervigor
 import (
 	"fmt"
 	"sync"
-	"bytes"
 )
 
 // A Supervigor starts and supervises goroutines
@@ -34,13 +33,12 @@ type Runnable interface {
 	Run()
 }
 
-
 // NewSupervigor returns and runs in a goroutine the Supervigor
 func NewSupervigor() Supervigor {
 	s := Supervigor{
 		superviseChan: make(chan RunnableWithName),
-		runnables: map[string]*runnableWithChan{},
-		mapMutex: &sync.Mutex{},
+		runnables:     map[string]*runnableWithChan{},
+		mapMutex:      &sync.Mutex{},
 	}
 	go s.run()
 	return s
@@ -66,7 +64,7 @@ func (s *Supervigor) runAndSupervise(name string, maxRestarts int, r Runnable) {
 	rwc, ok := s.runnables[name]
 	if !ok {
 		rwc = &runnableWithChan{
-			rchan: make(chan bool),
+			rchan:    make(chan bool),
 			runnable: r,
 		}
 		s.runnables[name] = rwc

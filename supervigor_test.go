@@ -2,9 +2,9 @@ package supervigor_test
 
 import (
 	"fmt"
-	"testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/mrkaspa/supervigor"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 type Runner struct {
@@ -27,9 +27,9 @@ func TestNewSupervigor(t *testing.T) {
 	sup := supervigor.NewSupervigor()
 	run := &Runner{"Michel", true, make(chan bool)}
 	sup.Supervise(supervigor.RunnableWithName{
-		Name: "demo",
+		Name:        "demo",
 		MaxRestarts: 1,
-		Runnable: run,
+		Runnable:    run,
 	})
 	assert.False(t, <-run.doneChan)
 	assert.True(t, <-run.doneChan)
@@ -39,9 +39,9 @@ func TestNewSupervigorMustFail(t *testing.T) {
 	sup := supervigor.NewSupervigor()
 	run := &Runner{"Michel", true, make(chan bool)}
 	sup.Supervise(supervigor.RunnableWithName{
-		Name: "demo",
+		Name:        "demo",
 		MaxRestarts: 0,
-		Runnable: run,
+		Runnable:    run,
 	})
 	assert.False(t, <-run.doneChan)
 }
