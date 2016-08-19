@@ -5,6 +5,7 @@ import (
 	"github.com/mrkaspa/supervigor"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 type Runner struct {
@@ -44,4 +45,9 @@ func TestNewSupervigorMustFail(t *testing.T) {
 		Runnable:    run,
 	})
 	assert.False(t, <-run.doneChan)
+	select {
+	case <-run.doneChan:
+		t.Error("Should not enter here")
+	case <-time.NewTimer(1 * time.Second).C:
+	}
 }
