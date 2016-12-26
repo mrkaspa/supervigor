@@ -1,78 +1,100 @@
 package supervigor
 
 import (
-  "fmt"
-  "sync"
+	"fmt"
+	"sync"
+	"time"
 )
 
 // A Supervigor starts and supervises goroutines
 type Supervigor struct {
-  runnables     map[string]*runnableWithChan
-  mapMutex      *sync.Mutex
+	runnables map[string]*runnableWithChan
+	mapMutex  *sync.Mutex
 }
 
 type runnableWithChan struct {
-  rchan    chan bool
-  restarts int
-  runnable Runnable
-}
-
-// A RunnableWithName packs the name of the goroutine,
-// the max amount of restarts and the Runnble object to run
-type RunnableWithName struct {
-  Name        string
-  MaxRestarts int
-  Runnable    Runnable
+	runnable    Runnable
+	rchan       chan bool
+	restarts    int
+	maxRestarts int
+	maxTime     int
+	restartTime time.Time
 }
 
 // Runnable is the main thread for the goroutine that will be
 // started and restarted
 type Runnable interface {
-  Run()
+	Run()
 }
 
 // NewSupervigor returns and runs in a goroutine the Supervigor
 func NewSupervigor() Supervigor {
-  s := Supervigor{
-    runnables:     map[string]*runnableWithChan{},
-    mapMutex:      &sync.Mutex{},
-  }
-  return s
+	s := Supervigor{
+		runnables: map[string]*runnableWithChan{},
+		mapMutex:  &sync.Mutex{},
+	}
+	return s
 }
 
-func (s *Supervigor) Supervise(name string, maxRestarts int, r Runnable) {
-  s.mapMutex.Lock()
-  rwc, ok := s.runnables[name]
-  if !ok {
-    rwc = &runnableWithChan{
-      rchan:    make(chan bool),
-      runnable: r,
-    }
-    s.runnables[name] = rwc
-  }
-  s.mapMutex.Unlock()
+// Supervise a Runnable
+func (s *Supervigor) Supervise(name string, maxRestarts int, maxTime int, r Runnable) {
+	s.mapMutex.Lock()
+	rwc, ok := s.runnables[name]
+	if !ok {
+		rwc = &runnableWithChan{
+			rchan:       make(chan bool),
+			runnable:    r,
+			maxTime:     maxTime,
+			maxRestarts: maxRestarts,
+			restarts:    0,
+			restartTime: time.Time{},
+		}
+		s.runnables[name] = rwc
+	}
+	s.mapMutex.Unlock()
 
-  //supervise the goroutine
-  go func() {
-    <-rwc.rchan
-    s.mapMutex.Lock()
-    s.runnables[name].restarts++
-    if s.runnables[name].restarts <= maxRestarts {
-      fmt.Printf("restarting #%d %s \n", s.runnables[name].restarts, name)
-      go s.Supervise(name, maxRestarts, r)
-    }
-    s.mapMutex.Unlock()
-  }()
+	go s.supervise(name, rwc)
+	go run(rwc)
+}
 
-  go run(rwc)
+func (s *Supervigor) supervise(name string, rwc *runnableWithChan) {
+	if rwc.restartTime.IsZero() {
+		<-rwc.rchan
+		rwc.restarts = 1
+		rwc.restartTime = time.Now()
+	} else {
+		select {
+		case <-rwc.rchan:
+			rwc.restarts++
+			res := time.Now().Sub(rwc.restartTime)
+			fmt.Printf("rwc.restarts(%d) > rwc.maxRestarts(%d) \n", rwc.restarts, rwc.maxRestarts)
+
+			if int(res.Seconds()) >= rwc.maxTime || rwc.restarts > rwc.maxRestarts {
+				fmt.Printf("removing %s from the supervisor\n", name)
+				s.mapMutex.Lock()
+				delete(s.runnables, name)
+				s.mapMutex.Unlock()
+				return
+			}
+		case <-time.NewTimer(3 * time.Second).C:
+			rwc.restartTime = time.Time{}
+			go s.supervise(name, rwc)
+			return
+		}
+	}
+	if rwc.restarts <= rwc.maxRestarts {
+		fmt.Printf("restarting #%d %s \n", rwc.restarts, name)
+		go run(rwc)
+		go s.supervise(name, rwc)
+	}
 }
 
 // run the go routine if it panics notify to the supervigor
 func run(rwc *runnableWithChan) {
-  defer func() {
-    if r := recover(); r != nil {
-      rwc.rchan <- true
-    }
-  }()
-  rwc.runnable.Run()
+	defer func() {
+		if r := recover(); r != nil {
+			rwc.rchan <- true
+		}
+	}()
+	rwc.runnable.Run()
 }
