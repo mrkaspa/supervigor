@@ -67,7 +67,6 @@ func (s *Supervigor) supervise(name string, rwc *runnableWithChan) {
 		case <-rwc.rchan:
 			rwc.restarts++
 			res := time.Now().Sub(rwc.restartTime)
-			fmt.Printf("rwc.restarts(%d) > rwc.maxRestarts(%d) \n", rwc.restarts, rwc.maxRestarts)
 
 			if int(res.Seconds()) >= rwc.maxTime || rwc.restarts > rwc.maxRestarts {
 				fmt.Printf("removing %s from the supervisor\n", name)
