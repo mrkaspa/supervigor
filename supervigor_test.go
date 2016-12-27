@@ -67,7 +67,6 @@ func whenIsRestartedManyTimes(t *testing.T) {
 	sup.Supervise("demo fail", 2, 5, run)
 	assert.True(t, <-run.startChan)
 	assert.True(t, <-run.startChan)
-	assert.True(t, <-run.startChan)
 	select {
 	case <-run.startChan:
 		t.Error("Should not enter here")

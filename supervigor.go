@@ -60,6 +60,9 @@ func (s *Supervigor) Supervise(name string, maxRestarts int, maxTime int, r Runn
 func (s *Supervigor) supervise(name string, rwc *runnableWithChan) {
 	if rwc.restartTime.IsZero() {
 		<-rwc.rchan
+		if rwc.restarts >= rwc.maxRestarts {
+			return
+		}
 		rwc.restarts = 1
 		rwc.restartTime = time.Now()
 	} else {
@@ -68,7 +71,7 @@ func (s *Supervigor) supervise(name string, rwc *runnableWithChan) {
 			rwc.restarts++
 			res := time.Now().Sub(rwc.restartTime)
 
-			if int(res.Seconds()) >= rwc.maxTime || rwc.restarts > rwc.maxRestarts {
+			if int(res.Seconds()) >= rwc.maxTime || rwc.restarts >= rwc.maxRestarts {
 				fmt.Printf("removing %s from the supervisor\n", name)
 				s.mapMutex.Lock()
 				delete(s.runnables, name)
@@ -81,11 +84,10 @@ func (s *Supervigor) supervise(name string, rwc *runnableWithChan) {
 			return
 		}
 	}
-	if rwc.restarts <= rwc.maxRestarts {
-		fmt.Printf("restarting #%d %s \n", rwc.restarts, name)
-		go run(rwc)
-		go s.supervise(name, rwc)
-	}
+
+	fmt.Printf("restarting #%d %s \n", rwc.restarts, name)
+	go run(rwc)
+	go s.supervise(name, rwc)
 }
 
 // run the go routine if it panics notify to the supervigor
